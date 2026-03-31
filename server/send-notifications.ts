@@ -3,12 +3,12 @@ import { supabase } from './index';
 
 const expo = new Expo();
 
-// Friendly bin names for notifications
+// Friendly bin names with colour circle emojis
 const BIN_NAMES: Record<string, string> = {
-  fogo: 'Organics (green lid)',
-  rubbish: 'General (red lid)',
-  recycling: 'Recycling (yellow lid)',
-  glass: 'Glass (purple lid)',
+  fogo: '🟢 Organics (green lid)',
+  rubbish: '🔴 General (red lid)',
+  recycling: '🟡 Recycling (yellow lid)',
+  glass: '🟣 Glass (purple lid)',
 };
 
 export async function sendNotifications() {
@@ -77,11 +77,7 @@ export async function sendNotifications() {
 
     if (binNames.length === 0) continue;
 
-    const binList = binNames.length === 1
-      ? binNames[0]
-      : binNames.slice(0, -1).join(', ') + ' and ' + binNames[binNames.length - 1];
-
-    const body = `Tomorrow: put out your ${binList} bins`;
+    const body = `Put your bins out tonight!\n${binNames.join('\n')}`;
 
     console.log(`  ${user.address}: ${body}`);
 
