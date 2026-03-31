@@ -1,0 +1,27 @@
+{
+  "name": "binnight",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.100.1",
+    "@types/node": "^25.5.0",
+    "cors": "^2.8.6",
+    "expo-server-sdk": "^6.1.0",
+    "express": "^5.2.1",
+    "playwright": "^1.58.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6"
+  }
+}
