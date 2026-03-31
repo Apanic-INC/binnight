@@ -90,7 +90,7 @@ export async function sendNotifications() {
     messages.push({
       to: user.push_token,
       sound: 'default',
-      title: 'Bin Night!',
+      title: 'Bin Night',
       body,
       data: { date: tomorrowStr, bins },
     });

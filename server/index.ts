@@ -229,7 +229,7 @@ app.post('/api/test-notification', async (req, res) => {
     const receipts = await expo.sendPushNotificationsAsync([{
       to: user.push_token,
       sound: 'default',
-      title: 'Bin Night!',
+      title: 'Bin Night',
       body: 'This is a test notification. Your bins are set up!',
       data: { test: true },
     }]);
