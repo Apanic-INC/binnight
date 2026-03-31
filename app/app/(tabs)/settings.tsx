@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { THEME } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
 
-const API_URL = 'http://192.168.20.4:3000';
+const API_URL = 'https://binnight-api.onrender.com';
 
 // Generate all 24 hours
 const REMINDER_TIMES = Array.from({ length: 24 }, (_, i) => {

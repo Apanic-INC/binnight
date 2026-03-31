@@ -15,7 +15,7 @@ import { router } from 'expo-router';
 import { THEME } from '../lib/theme';
 
 // Point this at your local API server
-const API_URL = 'http://192.168.20.4:3000';
+const API_URL = 'https://binnight-api.onrender.com';
 
 export default function SetupScreen() {
   const [address, setAddress] = useState('');

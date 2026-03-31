@@ -1,9 +1,5 @@
 import { Expo, type ExpoPushMessage } from 'expo-server-sdk';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://rnbolrhsrhipljoaiwuw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYm9scmhzcmhpcGxqb2Fpd3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzQ3MjgsImV4cCI6MjA5MDQxMDcyOH0.105xmarhEYsmVkgCL0WloInOWGnsuopesVbmG3uenqU';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+import { supabase } from './index';
 
 const expo = new Expo();
 
@@ -15,7 +11,7 @@ const BIN_NAMES: Record<string, string> = {
   glass: 'Glass (purple lid)',
 };
 
-async function sendNotifications() {
+export async function sendNotifications() {
   console.log('\n=== Bin Night Notification Sender ===');
 
   // Get current time in Melbourne
@@ -132,5 +128,7 @@ async function sendNotifications() {
   console.log('\nDone!');
 }
 
-// Run it
-sendNotifications().catch(console.error);
+// Run standalone if called directly
+if (require.main === module) {
+  sendNotifications().catch(console.error);
+}

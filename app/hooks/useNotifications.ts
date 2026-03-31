@@ -4,7 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://192.168.20.4:3000';
+const API_URL = 'https://binnight-api.onrender.com';
 
 // Configure how notifications appear when the app is in the foreground
 Notifications.setNotificationHandler({

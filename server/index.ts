@@ -292,6 +292,18 @@ app.post('/api/cleanup-user', async (req, res) => {
   }
 });
 
+// GET /api/send-notifications — triggered by cron-job.org every hour
+app.get('/api/send-notifications', async (req, res) => {
+  try {
+    const { sendNotifications } = await import('./send-notifications');
+    await sendNotifications();
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('Notification error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
