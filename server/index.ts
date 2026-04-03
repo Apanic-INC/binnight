@@ -15,6 +15,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 export interface CollectionEvent {
   date: string;
   bins: string[];
+  isHoliday?: boolean;
 }
 
 // Registry of scraper functions — add new councils here
