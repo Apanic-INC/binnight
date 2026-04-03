@@ -19,9 +19,9 @@ function getRelativeDay(dateStr: string): string {
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Tomorrow';
   if (diffDays < 7) {
-    return target.toLocaleDateString('en-AU', { weekday: 'long' });
+    return `In ${diffDays} days`;
   }
-  return target.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' });
+  return `In ${diffDays} days`;
 }
 
 function formatDate(dateStr: string): string {

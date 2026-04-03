@@ -85,9 +85,9 @@ async function scrapeMerriBek() {
 
       imgs.forEach(img => {
         const src = img.getAttribute('src') || '';
-        if (src.includes('bin-holiday')) {
-          bins.push('holiday');
-        } else if (src.includes('bin.png') || src.includes('bin-')) {
+        // Skip holiday images — we handle holidays with our own rules
+        if (src.includes('bin-holiday')) return;
+        if (src.includes('bin.png') || src.includes('bin-')) {
           if (!bins.includes('fogo')) bins.push('fogo');
           if (!bins.includes('rubbish')) bins.push('rubbish');
         }

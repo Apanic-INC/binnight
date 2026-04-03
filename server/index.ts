@@ -24,6 +24,68 @@ const SCRAPERS: Record<string, (address: string) => Promise<CollectionEvent[]>> 
   // 'yarra': scrapeYarra,
 };
 
+/**
+ * Merri-bek holiday rules:
+ * - Only Christmas Day (Dec 25) and New Year's Day (Jan 1) cancel collections.
+ * - For the 2 weeks following each holiday, Thursday and Friday collections
+ *   are pushed forward by 1 day (Thu→Fri, Fri→Sat).
+ * - All other public holidays have normal collection.
+ */
+function applyMerriBekHolidayRules(events: CollectionEvent[]): (CollectionEvent & { isHoliday?: boolean })[] {
+  const result: (CollectionEvent & { isHoliday?: boolean })[] = [];
+
+  // Find the year range from the events
+  const years = new Set(events.map(e => parseInt(e.date.split('-')[0])));
+
+  // Build list of affected holidays (Christmas + New Year's)
+  const holidays: string[] = [];
+  for (const year of years) {
+    holidays.push(`${year}-12-25`); // Christmas Day
+    holidays.push(`${year}-01-01`); // New Year's Day
+  }
+
+  // For each holiday, determine the 2-week affected window
+  const affectedRanges: { start: Date; end: Date }[] = [];
+  for (const h of holidays) {
+    const holidayDate = new Date(h + 'T00:00:00');
+    const endDate = new Date(holidayDate);
+    endDate.setDate(endDate.getDate() + 14); // 2 weeks
+    affectedRanges.push({ start: holidayDate, end: endDate });
+  }
+
+  for (const event of events) {
+    const eventDate = new Date(event.date + 'T00:00:00');
+    const dayOfWeek = eventDate.getDay(); // 0=Sun, 4=Thu, 5=Fri
+
+    // Check if this date IS Christmas or New Year's
+    const isChristmasOrNewYears = holidays.includes(event.date);
+
+    if (isChristmasOrNewYears) {
+      // Mark as holiday — no collection
+      result.push({ ...event, bins: event.bins, isHoliday: true });
+      continue;
+    }
+
+    // Check if this date falls in an affected 2-week window AND is Thu or Fri
+    const inAffectedWindow = affectedRanges.some(
+      r => eventDate >= r.start && eventDate < r.end
+    );
+
+    if (inAffectedWindow && (dayOfWeek === 4 || dayOfWeek === 5)) {
+      // Push forward by 1 day (Thu→Fri, Fri→Sat)
+      const newDate = new Date(eventDate);
+      newDate.setDate(newDate.getDate() + 1);
+      const newDateStr = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+      result.push({ date: newDateStr, bins: event.bins });
+    } else {
+      // Normal collection — no holiday
+      result.push({ ...event });
+    }
+  }
+
+  return result;
+}
+
 // POST /api/setup — receives an address (and optional existingUserId), identifies council, scrapes schedule
 app.post('/api/setup', async (req, res) => {
   const { address, existingUserId } = req.body;
@@ -142,13 +204,18 @@ app.post('/api/setup', async (req, res) => {
       console.log(`Created user: ${userId}, zone: ${zone}`);
     }
 
-    // 5. Insert new schedule
-    const rows = events.map(event => ({
+    // 5. Apply council-specific holiday rules
+    const processedEvents = councilInfo.scraperId === 'merri-bek'
+      ? applyMerriBekHolidayRules(events)
+      : events;
+
+    // 6. Insert new schedule
+    const rows = processedEvents.map(event => ({
       council_id: council.id,
       zone,
       date: event.date,
-      bins: event.bins.filter(b => b !== 'holiday'),
-      is_holiday: event.bins.includes('holiday'),
+      bins: event.bins,
+      is_holiday: event.isHoliday || false,
     }));
 
     let inserted = 0;
@@ -302,6 +369,71 @@ app.get('/api/send-notifications', async (req, res) => {
     console.error('Notification error:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/bins-out-status — check if bins are out for a household (by address)
+app.get('/api/bins-out-status', async (req, res) => {
+  const address = req.query.address as string;
+  if (!address) {
+    return res.status(400).json({ error: 'address required' });
+  }
+
+  const { data } = await supabase
+    .from('household_status')
+    .select('bins_out_date')
+    .eq('address', address.trim().toLowerCase())
+    .single();
+
+  res.json({ binsOutDate: data?.bins_out_date || null });
+});
+
+// POST /api/bins-out — mark bins as out for a household
+app.post('/api/bins-out', async (req, res) => {
+  const { address, collectionDate } = req.body;
+  if (!address || !collectionDate) {
+    return res.status(400).json({ error: 'address and collectionDate required' });
+  }
+
+  const normalizedAddress = address.trim().toLowerCase();
+
+  const { error } = await supabase
+    .from('household_status')
+    .upsert({
+      address: normalizedAddress,
+      bins_out_date: collectionDate,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'address' });
+
+  if (error) {
+    console.error('Error setting bins out:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  console.log(`Bins marked out for ${normalizedAddress} (collection: ${collectionDate})`);
+  res.json({ success: true });
+});
+
+// POST /api/bins-out-undo — undo bins out for a household
+app.post('/api/bins-out-undo', async (req, res) => {
+  const { address } = req.body;
+  if (!address) {
+    return res.status(400).json({ error: 'address required' });
+  }
+
+  const normalizedAddress = address.trim().toLowerCase();
+
+  const { error } = await supabase
+    .from('household_status')
+    .delete()
+    .eq('address', normalizedAddress);
+
+  if (error) {
+    console.error('Error undoing bins out:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  console.log(`Bins out cleared for ${normalizedAddress}`);
+  res.json({ success: true });
 });
 
 app.get('/api/health', (req, res) => {

@@ -1,0 +1,30 @@
+diff --git a/node_modules/react-native-widget-extension/ios/Attributes.swift b/node_modules/react-native-widget-extension/ios/Attributes.swift
+new file mode 100644
+index 0000000..e97eeef
+--- /dev/null
++++ b/node_modules/react-native-widget-extension/ios/Attributes.swift
+@@ -0,0 +1,11 @@
++import ActivityKit
++
++// Required by react-native-widget-extension but we don't use Live Activities
++struct BinNightAttributes: ActivityAttributes {
++    public struct ContentState: Codable, Hashable {
++        var binTypes: String
++        var collectionDay: String
++    }
++
++    var name: String
++}
+diff --git a/node_modules/react-native-widget-extension/ios/Module.swift b/node_modules/react-native-widget-extension/ios/Module.swift
+new file mode 100644
+index 0000000..c736960
+--- /dev/null
++++ b/node_modules/react-native-widget-extension/ios/Module.swift
+@@ -0,0 +1,7 @@
++import ExpoModulesCore
++
++public class ReactNativeWidgetExtensionModule: Module {
++  public func definition() -> ModuleDefinition {
++    Name("WidgetExtension")
++  }
++}
