@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { THEME } from '../../lib/theme';
@@ -142,6 +142,14 @@ export default function SettingsScreen() {
         <Text style={styles.changeButtonText}>Change Address</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.privacyButton}
+        onPress={() => Linking.openURL('https://apanic-inc.github.io/binnight/privacy.html')}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.privacyButtonText}>Privacy Policy</Text>
+      </TouchableOpacity>
+
       <View style={styles.versionCard}>
         <Text style={styles.versionText}>Bin Night v0.1.0</Text>
       </View>
@@ -259,6 +267,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: THEME.warmYellow,
+  },
+  privacyButton: {
+    marginTop: 24,
+    alignItems: 'center' as const,
+  },
+  privacyButtonText: {
+    fontSize: 14,
+    color: THEME.textMuted,
+    fontWeight: '600',
+    textDecorationLine: 'underline' as const,
   },
   versionCard: {
     marginTop: 32,
