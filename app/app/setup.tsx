@@ -141,7 +141,7 @@ export default function SetupScreen() {
         </View>
 
         <Text style={styles.footer}>
-          This takes about 15 seconds — we're checking{'\n'}your council's website for your schedule.
+          This can take about a minute —{'\n'}we're checking your council's website for your schedule.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

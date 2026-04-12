@@ -32,13 +32,15 @@ export async function scrapeMerriBek(address: string): Promise<CollectionEvent[]
     // Type address
     const addressInput = page.locator('#address');
     await addressInput.click();
-    await addressInput.pressSequentially(shortAddress, { delay: 100 });
-    await page.waitForTimeout(2000);
+    await addressInput.pressSequentially(shortAddress, { delay: 50 });
+
+    // Wait for autocomplete dropdown to actually appear
+    await page.locator('.ui-autocomplete .ui-menu-item').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     let found = false;
 
     // Wait for dropdown and find best match
-    for (let attempt = 0; attempt < 8; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       const menuItems = page.locator('.ui-autocomplete .ui-menu-item');
       const count = await menuItems.count();
 
@@ -75,16 +77,17 @@ export async function scrapeMerriBek(address: string): Promise<CollectionEvent[]
         }
       }
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
     }
 
     if (!found) {
       // Retry
       console.log('[merri-bek] Retrying address entry...');
       await addressInput.clear();
-      await page.waitForTimeout(500);
-      await addressInput.pressSequentially(shortAddress, { delay: 120 });
-      await page.waitForTimeout(3000);
+      await addressInput.pressSequentially(shortAddress, { delay: 50 });
+
+      // Wait for dropdown to appear
+      await page.locator('.ui-autocomplete .ui-menu-item').first().waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
 
       const menuItems = page.locator('.ui-autocomplete .ui-menu-item');
       if (await menuItems.count() > 0) {
@@ -97,7 +100,7 @@ export async function scrapeMerriBek(address: string): Promise<CollectionEvent[]
       throw new Error('Address not found on the Merri-bek council website.');
     }
 
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(300);
 
     // Click Search
     await page.locator('.search-address button.button').click();
