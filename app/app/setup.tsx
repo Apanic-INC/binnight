@@ -13,9 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { THEME } from '../lib/theme';
-
-// Point this at your local API server
-const API_URL = 'https://binnight-api.onrender.com';
+import { apiFetch } from '../lib/api';
 
 export default function SetupScreen() {
   const [address, setAddress] = useState('');
@@ -37,9 +35,8 @@ export default function SetupScreen() {
       // Check if there's an existing user (address change scenario)
       const existingUserId = await AsyncStorage.getItem('userId');
 
-      const response = await fetch(`${API_URL}/api/setup`, {
+      const response = await apiFetch('/api/setup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address: address.trim(),
           existingUserId: existingUserId || undefined,

@@ -3,8 +3,7 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_URL = 'https://binnight-api.onrender.com';
+import { apiFetch } from '../lib/api';
 
 // Configure how notifications appear when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -66,9 +65,8 @@ export function useNotifications() {
 
       if (userId) {
         try {
-          const response = await fetch(`${API_URL}/api/save-push-token`, {
+          const response = await apiFetch('/api/save-push-token', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, pushToken: token }),
           });
 

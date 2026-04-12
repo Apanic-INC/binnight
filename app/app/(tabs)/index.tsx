@@ -10,8 +10,7 @@ import { THEME } from '../../lib/theme';
 import { useNotifications } from '../../hooks/useNotifications';
 import type { CollectionEvent } from '../../lib/types';
 import { updateWidgetData } from '../../lib/widgetData';
-
-const API_URL = 'https://binnight-api.onrender.com';
+import { apiFetch } from '../../lib/api';
 
 function isToday(dateStr: string): boolean {
   const today = new Date();
@@ -52,7 +51,7 @@ export default function HomeScreen() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/bins-out-status?address=${encodeURIComponent(userAddress)}`);
+      const response = await apiFetch(`/api/bins-out-status?address=${encodeURIComponent(userAddress)}`);
       const data = await response.json();
       const savedDate = data.binsOutDate;
 
@@ -67,17 +66,15 @@ export default function HomeScreen() {
 
       if (savedDate === todayStr && now.getHours() >= 12) {
         // It's past noon on collection day — auto-clear for the household
-        await fetch(`${API_URL}/api/bins-out-undo`, {
+        await apiFetch('/api/bins-out-undo', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: userAddress }),
         });
         setBinsAreOut(false);
       } else if (savedDate < todayStr) {
         // Old date — clear it
-        await fetch(`${API_URL}/api/bins-out-undo`, {
+        await apiFetch('/api/bins-out-undo', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: userAddress }),
         });
         setBinsAreOut(false);
@@ -96,9 +93,8 @@ export default function HomeScreen() {
     if (!userAddress) return;
 
     try {
-      await fetch(`${API_URL}/api/bins-out`, {
+      await apiFetch('/api/bins-out', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: userAddress, collectionDate: nextCollection.date }),
       });
     } catch (err) {
@@ -119,9 +115,8 @@ export default function HomeScreen() {
     const userAddress = await AsyncStorage.getItem('userAddress');
     if (userAddress) {
       try {
-        await fetch(`${API_URL}/api/bins-out-undo`, {
+        await apiFetch('/api/bins-out-undo', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: userAddress }),
         });
       } catch (err) {

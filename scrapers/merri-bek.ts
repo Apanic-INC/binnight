@@ -5,9 +5,9 @@ import * as fs from 'fs';
 const ADDRESS = '174 Donald St';
 const CALENDAR_URL = 'https://www.merri-bek.vic.gov.au/living-in-merri-bek/waste-and-recycling/bins-and-collection-services/waste-calendar26/';
 
-// Supabase connection
-const SUPABASE_URL = 'https://rnbolrhsrhipljoaiwuw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYm9scmhzcmhpcGxqb2Fpd3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzQ3MjgsImV4cCI6MjA5MDQxMDcyOH0.105xmarhEYsmVkgCL0WloInOWGnsuopesVbmG3uenqU';
+// Supabase connection — use environment variables
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 interface CollectionEvent {

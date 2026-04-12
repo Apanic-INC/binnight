@@ -8,9 +8,35 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const SUPABASE_URL = 'https://rnbolrhsrhipljoaiwuw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYm9scmhzcmhpcGxqb2Fpd3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzQ3MjgsImV4cCI6MjA5MDQxMDcyOH0.105xmarhEYsmVkgCL0WloInOWGnsuopesVbmG3uenqU';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('Missing SUPABASE_URL or SUPABASE_KEY environment variables');
+  process.exit(1);
+}
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Auth middleware — requires Bearer token matching BN_API_KEY
+const BN_API_KEY = process.env.BN_API_KEY || '';
+const CRON_KEY = process.env.CRON_KEY || '';
+
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${BN_API_KEY}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+function requireCronAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const key = req.query.key as string;
+  if (!key || key !== CRON_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
 
 export interface CollectionEvent {
   date: string;
@@ -88,7 +114,7 @@ function applyMerriBekHolidayRules(events: CollectionEvent[]): (CollectionEvent 
 }
 
 // POST /api/setup — receives an address (and optional existingUserId), identifies council, scrapes schedule
-app.post('/api/setup', async (req, res) => {
+app.post('/api/setup', requireAuth, async (req, res) => {
   const { address, existingUserId } = req.body;
 
   if (!address || address.trim().length < 5) {
@@ -250,7 +276,7 @@ app.post('/api/setup', async (req, res) => {
 });
 
 // POST /api/save-push-token — save a user's push token
-app.post('/api/save-push-token', async (req, res) => {
+app.post('/api/save-push-token', requireAuth, async (req, res) => {
   const { userId, pushToken } = req.body;
 
   if (!userId || !pushToken) {
@@ -272,7 +298,7 @@ app.post('/api/save-push-token', async (req, res) => {
 });
 
 // POST /api/test-notification — send a test notification to a specific user
-app.post('/api/test-notification', async (req, res) => {
+app.post('/api/test-notification', requireAuth, async (req, res) => {
   const { userId } = req.body;
 
   try {
@@ -312,7 +338,7 @@ app.post('/api/test-notification', async (req, res) => {
 });
 
 // POST /api/cleanup-user — delete old user data when changing address
-app.post('/api/cleanup-user', async (req, res) => {
+app.post('/api/cleanup-user', requireAuth, async (req, res) => {
   const { userId } = req.body;
 
   if (!userId) {
@@ -361,7 +387,7 @@ app.post('/api/cleanup-user', async (req, res) => {
 });
 
 // GET /api/send-notifications — triggered by cron-job.org every hour
-app.get('/api/send-notifications', async (req, res) => {
+app.get('/api/send-notifications', requireCronAuth, async (req, res) => {
   try {
     const { sendNotifications } = await import('./send-notifications');
     await sendNotifications();
@@ -373,7 +399,7 @@ app.get('/api/send-notifications', async (req, res) => {
 });
 
 // GET /api/bins-out-status — check if bins are out for a household (by address)
-app.get('/api/bins-out-status', async (req, res) => {
+app.get('/api/bins-out-status', requireAuth, async (req, res) => {
   const address = req.query.address as string;
   if (!address) {
     return res.status(400).json({ error: 'address required' });
@@ -389,7 +415,7 @@ app.get('/api/bins-out-status', async (req, res) => {
 });
 
 // POST /api/bins-out — mark bins as out for a household
-app.post('/api/bins-out', async (req, res) => {
+app.post('/api/bins-out', requireAuth, async (req, res) => {
   const { address, collectionDate } = req.body;
   if (!address || !collectionDate) {
     return res.status(400).json({ error: 'address and collectionDate required' });
@@ -415,7 +441,7 @@ app.post('/api/bins-out', async (req, res) => {
 });
 
 // POST /api/bins-out-undo — undo bins out for a household
-app.post('/api/bins-out-undo', async (req, res) => {
+app.post('/api/bins-out-undo', requireAuth, async (req, res) => {
   const { address } = req.body;
   if (!address) {
     return res.status(400).json({ error: 'address required' });
