@@ -67,6 +67,7 @@ function findZone(lng: number, lat: number): ZonePolygon | null {
 
 /**
  * Geocode an address using OpenStreetMap Nominatim (free, no API key).
+ * Retries on 429 (rate limit) with a delay.
  */
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   const query = `${address}, City of Yarra, Victoria, Australia`;
@@ -77,23 +78,37 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
     countrycodes: 'au',
   });
 
-  const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-    headers: {
-      'User-Agent': 'BinNight-App/1.0 (apanic.inc@gmail.com)',
-    },
-  });
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+      headers: {
+        'User-Agent': 'BinNight-App/1.0 (apanic.inc@gmail.com)',
+      },
+    });
 
-  if (!resp.ok) {
-    throw new Error(`Nominatim geocoding error: ${resp.status}`);
+    if (resp.status === 429) {
+      console.log(`[yarra] Nominatim rate limited (attempt ${attempt}/${maxRetries}), waiting...`);
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        continue;
+      }
+      throw new Error('Geocoding service is temporarily busy. Please try again in a moment.');
+    }
+
+    if (!resp.ok) {
+      throw new Error(`Nominatim geocoding error: ${resp.status}`);
+    }
+
+    const results = await resp.json();
+    if (results.length === 0) return null;
+
+    return {
+      lat: parseFloat(results[0].lat),
+      lng: parseFloat(results[0].lon),
+    };
   }
 
-  const results = await resp.json();
-  if (results.length === 0) return null;
-
-  return {
-    lat: parseFloat(results[0].lat),
-    lng: parseFloat(results[0].lon),
-  };
+  return null;
 }
 
 /**
