@@ -108,8 +108,8 @@ export default function SetupScreen() {
           />
 
           <Text style={styles.councilNote}>
-            Currently supports Merri-bek and Darebin{'\n'}
-            council areas
+            Currently supports Merri-bek, Darebin,{'\n'}
+            and Yarra council areas
           </Text>
 
           {error && (

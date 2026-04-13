@@ -36,6 +36,17 @@ const SUBURB_MAP: Record<string, CouncilMapping> = {
   'kingsbury': { scraperId: 'darebin', councilName: 'City of Darebin' },
   'bundoora': { scraperId: 'darebin', councilName: 'City of Darebin' },
   'macleod': { scraperId: 'darebin', councilName: 'City of Darebin' },
+
+  // Yarra suburbs
+  'abbotsford': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'burnley': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'carlton north': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'clifton hill': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'collingwood': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'cremorne': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'fitzroy': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'fitzroy north': { scraperId: 'yarra', councilName: 'City of Yarra' },
+  'richmond': { scraperId: 'yarra', councilName: 'City of Yarra' },
 };
 
 const POSTCODE_MAP: Record<string, CouncilMapping> = {
@@ -55,6 +66,14 @@ const POSTCODE_MAP: Record<string, CouncilMapping> = {
   '3073': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Reservoir
   '3078': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Alphington / Fairfield
   '3083': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Bundoora / Kingsbury
+
+  // Yarra postcodes
+  '3065': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Fitzroy
+  '3066': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Collingwood
+  '3067': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Abbotsford
+  '3068': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Fitzroy North / Clifton Hill
+  '3121': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Richmond / Burnley / Cremorne
+  '3054': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Carlton North
 };
 
 export function lookupCouncil(address: string): CouncilMapping | null {

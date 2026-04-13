@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { lookupCouncil } from './council-lookup';
 import { scrapeMerriBek } from './scrapers/merri-bek';
 import { scrapeDarebin } from './scrapers/darebin';
+import { scrapeYarra } from './scrapers/yarra';
 
 const app = express();
 app.use(cors());
@@ -49,7 +50,7 @@ export interface CollectionEvent {
 const SCRAPERS: Record<string, (address: string) => Promise<CollectionEvent[]>> = {
   'merri-bek': scrapeMerriBek,
   'darebin': scrapeDarebin,
-  // 'yarra': scrapeYarra,
+  'yarra': scrapeYarra,
 };
 
 /**
@@ -193,6 +194,38 @@ function applyDarebinHolidayRules(events: (CollectionEvent & { isHoliday?: boole
   return result;
 }
 
+/**
+ * Yarra holiday rules:
+ * - Only Christmas Day (Dec 25) shifts collection forward by 1 day.
+ * - All other public holidays have normal collection.
+ */
+function applyYarraHolidayRules(events: CollectionEvent[]): (CollectionEvent & { isHoliday?: boolean })[] {
+  const result: (CollectionEvent & { isHoliday?: boolean })[] = [];
+
+  const years = new Set(events.map(e => parseInt(e.date.split('-')[0])));
+  const christmasDays = new Set<string>();
+  for (const year of years) {
+    christmasDays.add(`${year}-12-25`);
+  }
+
+  for (const event of events) {
+    if (christmasDays.has(event.date)) {
+      // Mark Christmas as holiday
+      result.push({ ...event, isHoliday: true });
+
+      // Shift to next day (Boxing Day)
+      const shifted = new Date(event.date + 'T00:00:00');
+      shifted.setDate(shifted.getDate() + 1);
+      const shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+      result.push({ date: shiftedStr, bins: event.bins });
+    } else {
+      result.push({ ...event });
+    }
+  }
+
+  return result;
+}
+
 // POST /api/setup — receives an address (and optional existingUserId), identifies council, scrapes schedule
 app.post('/api/setup', requireAuth, async (req, res) => {
   const { address, existingUserId } = req.body;
@@ -212,7 +245,7 @@ app.post('/api/setup', requireAuth, async (req, res) => {
 
     if (!councilInfo) {
       return res.status(400).json({
-        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek and Darebin council areas.',
+        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek, Darebin, and Yarra council areas.',
       });
     }
 
@@ -317,6 +350,8 @@ app.post('/api/setup', requireAuth, async (req, res) => {
       processedEvents = applyMerriBekHolidayRules(events);
     } else if (councilInfo.scraperId === 'darebin') {
       processedEvents = applyDarebinHolidayRules(events);
+    } else if (councilInfo.scraperId === 'yarra') {
+      processedEvents = applyYarraHolidayRules(events);
     } else {
       processedEvents = events;
     }
