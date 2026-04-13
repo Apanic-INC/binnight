@@ -116,9 +116,15 @@ export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
     resultRecordCount: '10',
   });
 
-  const addrUrl = `${ADDRESS_URL}?${addrParams}`;
-  console.log(`[yarra] Fetching: ${addrUrl}`);
-  const addrResp = await fetch(addrUrl, { headers: FETCH_HEADERS });
+  console.log(`[yarra] Fetching address via POST`);
+  const addrResp = await fetch(ADDRESS_URL, {
+    method: 'POST',
+    headers: {
+      ...FETCH_HEADERS,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: addrParams.toString(),
+  });
   if (!addrResp.ok) {
     const body = await addrResp.text();
     console.error(`[yarra] Address API error ${addrResp.status}: ${body.substring(0, 500)}`);
@@ -164,8 +170,17 @@ export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
     f: 'json',
   });
 
-  const zoneResp = await fetch(`${ZONES_URL}?${zoneParams}`, { headers: FETCH_HEADERS });
+  const zoneResp = await fetch(ZONES_URL, {
+    method: 'POST',
+    headers: {
+      ...FETCH_HEADERS,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: zoneParams.toString(),
+  });
   if (!zoneResp.ok) {
+    const body = await zoneResp.text();
+    console.error(`[yarra] Zone API error ${zoneResp.status}: ${body.substring(0, 500)}`);
     throw new Error(`Yarra zone API error: ${zoneResp.status}`);
   }
 
