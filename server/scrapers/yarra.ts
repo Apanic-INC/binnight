@@ -116,8 +116,12 @@ export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
     resultRecordCount: '10',
   });
 
-  const addrResp = await fetch(`${ADDRESS_URL}?${addrParams}`, { headers: FETCH_HEADERS });
+  const addrUrl = `${ADDRESS_URL}?${addrParams}`;
+  console.log(`[yarra] Fetching: ${addrUrl}`);
+  const addrResp = await fetch(addrUrl, { headers: FETCH_HEADERS });
   if (!addrResp.ok) {
+    const body = await addrResp.text();
+    console.error(`[yarra] Address API error ${addrResp.status}: ${body.substring(0, 500)}`);
     throw new Error(`Yarra address API error: ${addrResp.status}`);
   }
 
