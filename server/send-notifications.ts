@@ -6,6 +6,7 @@ const expo = new Expo();
 // Friendly bin names with colour circle emojis
 const BIN_NAMES: Record<string, string> = {
   fogo: '🟢 Organics (green lid)',
+  green: '🟢 Food & Green (green lid)',
   rubbish: '🔴 General (red lid)',
   recycling: '🟡 Recycling (yellow lid)',
   glass: '🟣 Glass (purple lid)',

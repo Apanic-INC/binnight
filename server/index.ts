@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import { lookupCouncil } from './council-lookup';
 import { scrapeMerriBek } from './scrapers/merri-bek';
+import { scrapeDarebin } from './scrapers/darebin';
 
 const app = express();
 app.use(cors());
@@ -47,7 +48,7 @@ export interface CollectionEvent {
 // Registry of scraper functions — add new councils here
 const SCRAPERS: Record<string, (address: string) => Promise<CollectionEvent[]>> = {
   'merri-bek': scrapeMerriBek,
-  // 'darebin': scrapeDarebin,
+  'darebin': scrapeDarebin,
   // 'yarra': scrapeYarra,
 };
 
@@ -113,6 +114,85 @@ function applyMerriBekHolidayRules(events: CollectionEvent[]): (CollectionEvent 
   return result;
 }
 
+/**
+ * Darebin holiday rules:
+ * - ALL Victorian public holidays cancel collections.
+ * - Collections shift forward by 1 day after each holiday.
+ * - If shifted date is also a holiday, shift again.
+ */
+function applyDarebinHolidayRules(events: (CollectionEvent & { isHoliday?: boolean })[]): (CollectionEvent & { isHoliday?: boolean })[] {
+  // Victorian public holidays (hardcoded for 2025-2027)
+  const holidays = new Set([
+    // 2025
+    '2025-01-01', // New Year's Day
+    '2025-01-27', // Australia Day (observed, 26th is Sunday)
+    '2025-03-10', // Labour Day (VIC)
+    '2025-04-18', // Good Friday
+    '2025-04-19', // Saturday before Easter
+    '2025-04-21', // Easter Monday
+    '2025-04-25', // ANZAC Day
+    '2025-06-09', // King's Birthday
+    '2025-09-26', // AFL Grand Final Friday
+    '2025-11-04', // Melbourne Cup
+    '2025-12-25', // Christmas Day
+    '2025-12-26', // Boxing Day
+    // 2026
+    '2026-01-01', // New Year's Day
+    '2026-01-26', // Australia Day
+    '2026-03-09', // Labour Day (VIC)
+    '2026-04-03', // Good Friday
+    '2026-04-04', // Saturday before Easter
+    '2026-04-06', // Easter Monday
+    '2026-04-25', // ANZAC Day (Saturday — observed Monday 27th)
+    '2026-04-27', // ANZAC Day observed
+    '2026-06-08', // King's Birthday
+    '2026-09-25', // AFL Grand Final Friday (estimated)
+    '2026-11-03', // Melbourne Cup
+    '2026-12-25', // Christmas Day
+    '2026-12-28', // Boxing Day (observed, 26th is Saturday)
+    // 2027
+    '2027-01-01', // New Year's Day
+    '2027-01-26', // Australia Day
+    '2027-03-08', // Labour Day (VIC)
+    '2027-03-26', // Good Friday
+    '2027-03-27', // Saturday before Easter
+    '2027-03-29', // Easter Monday
+    '2027-04-26', // ANZAC Day (observed, 25th is Sunday)
+    '2027-06-14', // King's Birthday
+    '2027-11-02', // Melbourne Cup
+    '2027-12-25', // Christmas Day (Saturday — observed Monday 27th)
+    '2027-12-27', // Christmas observed
+    '2027-12-26', // Boxing Day (Sunday — observed Tuesday 28th)
+    '2027-12-28', // Boxing Day observed
+  ]);
+
+  const result: (CollectionEvent & { isHoliday?: boolean })[] = [];
+
+  for (const event of events) {
+    if (holidays.has(event.date)) {
+      // Mark as holiday — no collection
+      result.push({ ...event, isHoliday: true });
+
+      // Shift to the next non-holiday day
+      const shifted = new Date(event.date + 'T00:00:00');
+      shifted.setDate(shifted.getDate() + 1);
+      let shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+
+      // Keep shifting if the new date is also a holiday
+      while (holidays.has(shiftedStr)) {
+        shifted.setDate(shifted.getDate() + 1);
+        shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+      }
+
+      result.push({ date: shiftedStr, bins: event.bins });
+    } else {
+      result.push({ ...event });
+    }
+  }
+
+  return result;
+}
+
 // POST /api/setup — receives an address (and optional existingUserId), identifies council, scrapes schedule
 app.post('/api/setup', requireAuth, async (req, res) => {
   const { address, existingUserId } = req.body;
@@ -132,7 +212,7 @@ app.post('/api/setup', requireAuth, async (req, res) => {
 
     if (!councilInfo) {
       return res.status(400).json({
-        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek council areas (Brunswick, Coburg, Glenroy, Pascoe Vale, etc.)',
+        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek and Darebin council areas.',
       });
     }
 
@@ -232,9 +312,14 @@ app.post('/api/setup', requireAuth, async (req, res) => {
     }
 
     // 5. Apply council-specific holiday rules
-    const processedEvents = councilInfo.scraperId === 'merri-bek'
-      ? applyMerriBekHolidayRules(events)
-      : events;
+    let processedEvents: (CollectionEvent & { isHoliday?: boolean })[];
+    if (councilInfo.scraperId === 'merri-bek') {
+      processedEvents = applyMerriBekHolidayRules(events);
+    } else if (councilInfo.scraperId === 'darebin') {
+      processedEvents = applyDarebinHolidayRules(events);
+    } else {
+      processedEvents = events;
+    }
 
     // 6. Insert new schedule
     const rows = processedEvents.map(event => ({

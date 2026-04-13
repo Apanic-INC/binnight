@@ -107,8 +107,8 @@ export default function SetupScreen() {
           />
 
           <Text style={styles.councilNote}>
-            Currently supports Merri-bek council areas{'\n'}
-            (Brunswick, Coburg, Northcote, Preston, etc.)
+            Currently supports Merri-bek and Darebin{'\n'}
+            council areas
           </Text>
 
           {error && (

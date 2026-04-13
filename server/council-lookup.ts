@@ -24,9 +24,18 @@ const SUBURB_MAP: Record<string, CouncilMapping> = {
   'tullamarine': { scraperId: 'merri-bek', councilName: 'Merri-bek City Council' },
   'merlynston': { scraperId: 'merri-bek', councilName: 'Merri-bek City Council' },
 
-  // Add more councils here as we build scrapers:
-  // 'northcote': { scraperId: 'darebin', councilName: 'City of Darebin' },
-  // 'preston': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  // Darebin suburbs
+  // Note: parts of Coburg are in Darebin but 'coburg' is mapped to Merri-bek above.
+  // Postcode-based lookup handles the overlap for unambiguous Darebin postcodes.
+  'alphington': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'fairfield': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'northcote': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'thornbury': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'preston': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'reservoir': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'kingsbury': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'bundoora': { scraperId: 'darebin', councilName: 'City of Darebin' },
+  'macleod': { scraperId: 'darebin', councilName: 'City of Darebin' },
 };
 
 const POSTCODE_MAP: Record<string, CouncilMapping> = {
@@ -38,6 +47,14 @@ const POSTCODE_MAP: Record<string, CouncilMapping> = {
   '3046': { scraperId: 'merri-bek', councilName: 'Merri-bek City Council' }, // Glenroy / Oak Park / Hadfield
   '3060': { scraperId: 'merri-bek', councilName: 'Merri-bek City Council' }, // Fawkner
   '3043': { scraperId: 'merri-bek', councilName: 'Merri-bek City Council' }, // Tullamarine / Gowanbrae
+
+  // Darebin postcodes
+  '3070': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Northcote
+  '3071': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Thornbury
+  '3072': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Preston
+  '3073': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Reservoir
+  '3078': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Alphington / Fairfield
+  '3083': { scraperId: 'darebin', councilName: 'City of Darebin' }, // Bundoora / Kingsbury
 };
 
 export function lookupCouncil(address: string): CouncilMapping | null {
