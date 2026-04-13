@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, LayoutChangeEvent } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
 import { BIN_COLOURS, BIN_LABELS, type BinType } from '../../lib/colours';
@@ -24,9 +24,29 @@ function getMonthName(month: number): string {
 export default function CalendarScreen() {
   const [events, setEvents] = useState<CollectionEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const monthYPositions = useRef<Record<number, number>>({});
+  const hasScrolled = useRef(false);
 
   useEffect(() => {
     fetchAllEvents();
+  }, []);
+
+  const handleMonthLayout = useCallback((month: number, event: LayoutChangeEvent) => {
+    monthYPositions.current[month] = event.nativeEvent.layout.y;
+
+    // Once the current month's position is known, scroll to it
+    const currentMonth = new Date().getMonth();
+    if (month === currentMonth && !hasScrolled.current) {
+      hasScrolled.current = true;
+      // Small delay to ensure layout is complete
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: monthYPositions.current[currentMonth] - 60,
+          animated: false,
+        });
+      }, 100);
+    }
   }, []);
 
   async function fetchAllEvents() {
@@ -56,15 +76,25 @@ export default function CalendarScreen() {
     );
   }
 
+  // Determine which bin types the user actually has
+  const userBinTypes = Array.from(
+    new Set(events.flatMap(e => e.bins.filter(b => b !== 'holiday')))
+  ) as BinType[];
+
+  // Show legend in a consistent order
+  const binOrder: BinType[] = ['fogo', 'green', 'rubbish', 'recycling', 'glass'];
+  const legendBins = binOrder.filter(b => userBinTypes.includes(b));
+
+  const currentYear = new Date().getFullYear();
   const months = Array.from({ length: 12 }, (_, i) => i);
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.yearTitle}>2026</Text>
+    <ScrollView style={styles.container} ref={scrollViewRef}>
+      <Text style={styles.yearTitle}>{currentYear}</Text>
 
-      {/* Legend */}
+      {/* Legend — shows only bin types the user has */}
       <View style={styles.legend}>
-        {(['fogo', 'rubbish', 'recycling', 'glass'] as BinType[]).map(bin => (
+        {legendBins.map(bin => (
           <View key={bin} style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: BIN_COLOURS[bin] }]} />
             <Text style={styles.legendText}>{BIN_LABELS[bin]}</Text>
@@ -73,7 +103,7 @@ export default function CalendarScreen() {
       </View>
 
       {months.map(month => {
-        const { daysInMonth, startDay } = getMonthData(2026, month);
+        const { daysInMonth, startDay } = getMonthData(currentYear, month);
         const cells: (number | null)[] = [];
         for (let i = 0; i < startDay; i++) cells.push(null);
         for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -85,7 +115,7 @@ export default function CalendarScreen() {
         }
 
         return (
-          <View key={month} style={styles.monthContainer}>
+          <View key={month} style={styles.monthContainer} onLayout={(e) => handleMonthLayout(month, e)}>
             <Text style={styles.monthTitle}>{getMonthName(month)}</Text>
             <View style={styles.monthCard}>
               <View style={styles.weekRow}>
@@ -101,7 +131,7 @@ export default function CalendarScreen() {
                       return <View key={di} style={styles.dayCell} />;
                     }
 
-                    const dateStr = `2026-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dateStr = `${currentYear}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const event = eventMap[dateStr];
                     const bins = event ? event.bins.filter(b => b !== 'holiday') as BinType[] : [];
                     const isHoliday = event?.is_holiday;
