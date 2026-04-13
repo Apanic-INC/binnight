@@ -6,6 +6,11 @@ const ZONES_URL = `${ARCGIS_BASE}/Hosted/Waster_Collection_Zones/FeatureServer/0
 
 const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Referer': 'https://www.yarracity.vic.gov.au/',
+};
+
 // Street type abbreviations → full names (ArcGIS uses full names)
 const STREET_TYPES: Record<string, string> = {
   'ST': 'STREET', 'RD': 'ROAD', 'AVE': 'AVENUE', 'AV': 'AVENUE',
@@ -111,7 +116,7 @@ export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
     resultRecordCount: '10',
   });
 
-  const addrResp = await fetch(`${ADDRESS_URL}?${addrParams}`);
+  const addrResp = await fetch(`${ADDRESS_URL}?${addrParams}`, { headers: FETCH_HEADERS });
   if (!addrResp.ok) {
     throw new Error(`Yarra address API error: ${addrResp.status}`);
   }
@@ -155,7 +160,7 @@ export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
     f: 'json',
   });
 
-  const zoneResp = await fetch(`${ZONES_URL}?${zoneParams}`);
+  const zoneResp = await fetch(`${ZONES_URL}?${zoneParams}`, { headers: FETCH_HEADERS });
   if (!zoneResp.ok) {
     throw new Error(`Yarra zone API error: ${zoneResp.status}`);
   }
