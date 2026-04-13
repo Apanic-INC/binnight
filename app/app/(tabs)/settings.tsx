@@ -18,6 +18,7 @@ const REMINDER_TIMES = Array.from({ length: 24 }, (_, i) => {
 
 export default function SettingsScreen() {
   const [address, setAddress] = useState('');
+  const [councilName, setCouncilName] = useState('');
   const [notifyTime, setNotifyTime] = useState('18:00:00');
   const [showTimePicker, setShowTimePicker] = useState(false);
 
@@ -28,6 +29,9 @@ export default function SettingsScreen() {
   async function loadSettings() {
     const addr = await AsyncStorage.getItem('userAddress');
     if (addr) setAddress(addr);
+
+    const council = await AsyncStorage.getItem('councilName');
+    if (council) setCouncilName(council);
 
     const savedTime = await AsyncStorage.getItem('notifyTime');
     if (savedTime) setNotifyTime(savedTime);
@@ -92,7 +96,7 @@ export default function SettingsScreen() {
 
       <View style={styles.infoCard}>
         <Text style={styles.infoLabel}>Council</Text>
-        <Text style={styles.infoValue}>Merri-bek City Council</Text>
+        <Text style={styles.infoValue}>{councilName || 'Not set'}</Text>
       </View>
 
       {/* Reminder Time - Tappable */}

@@ -55,6 +55,7 @@ export default function SetupScreen() {
       await AsyncStorage.setItem('userId', data.userId);
       await AsyncStorage.setItem('userZone', data.zone);
       await AsyncStorage.setItem('userAddress', address.trim());
+      await AsyncStorage.setItem('councilName', data.councilName || '');
 
       setStatus('Done! Loading your bins...');
 
