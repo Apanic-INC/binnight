@@ -1,25 +1,8 @@
 import type { CollectionEvent } from '../index';
-
-const ARCGIS_BASE = 'https://yccgis-prd.esriaustraliaonline.com.au/arcgis/rest/services';
-const ADDRESS_URL = `${ARCGIS_BASE}/FYC_WM_PRD___MCH_Address_Look_Up_MIL1/MapServer/0/query`;
-const ZONES_URL = `${ARCGIS_BASE}/Hosted/Waster_Collection_Zones/FeatureServer/0/query`;
+import * as fs from 'fs';
+import * as path from 'path';
 
 const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
-
-const FETCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Referer': 'https://www.yarracity.vic.gov.au/',
-};
-
-// Street type abbreviations → full names (ArcGIS uses full names)
-const STREET_TYPES: Record<string, string> = {
-  'ST': 'STREET', 'RD': 'ROAD', 'AVE': 'AVENUE', 'AV': 'AVENUE',
-  'DR': 'DRIVE', 'CT': 'COURT', 'CRT': 'COURT', 'CR': 'CRESCENT',
-  'CRES': 'CRESCENT', 'PL': 'PLACE', 'TCE': 'TERRACE', 'TER': 'TERRACE',
-  'PDE': 'PARADE', 'LN': 'LANE', 'WAY': 'WAY', 'CL': 'CLOSE',
-  'GR': 'GROVE', 'GRV': 'GROVE', 'BVD': 'BOULEVARD', 'BLVD': 'BOULEVARD',
-  'HWY': 'HIGHWAY',
-};
 
 // Reference dates for recycling per zone (extracted from council PDF calendars).
 // Zones on the same collection day have opposite recycling/glass fortnights.
@@ -37,8 +20,80 @@ const ZONE_RECYCLE_REF: Record<number, string> = {
   10: '2025-07-04', // Friday
 };
 
-function expandStreetType(address: string): string {
-  return address.split(/\s+/).map(p => STREET_TYPES[p] || p).join(' ');
+interface ZonePolygon {
+  zone_num: number;
+  collection_day: string;
+  rings: number[][][];
+}
+
+// Load zone polygons from pre-cached file (fetched from Yarra ArcGIS, simplified)
+let cachedZones: ZonePolygon[] | null = null;
+function loadZones(): ZonePolygon[] {
+  if (cachedZones) return cachedZones;
+  const zonesPath = path.join(__dirname, 'yarra-zones.json');
+  cachedZones = JSON.parse(fs.readFileSync(zonesPath, 'utf-8'));
+  return cachedZones!;
+}
+
+/**
+ * Ray-casting point-in-polygon test.
+ */
+function pointInPolygon(x: number, y: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Find which zone a coordinate falls in.
+ */
+function findZone(lng: number, lat: number): ZonePolygon | null {
+  const zones = loadZones();
+  for (const zone of zones) {
+    for (const ring of zone.rings) {
+      if (pointInPolygon(lng, lat, ring)) {
+        return zone;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Geocode an address using OpenStreetMap Nominatim (free, no API key).
+ */
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  const query = `${address}, City of Yarra, Victoria, Australia`;
+  const params = new URLSearchParams({
+    q: query,
+    format: 'json',
+    limit: '1',
+    countrycodes: 'au',
+  });
+
+  const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+    headers: {
+      'User-Agent': 'BinNight-App/1.0 (apanic.inc@gmail.com)',
+    },
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Nominatim geocoding error: ${resp.status}`);
+  }
+
+  const results = await resp.json();
+  if (results.length === 0) return null;
+
+  return {
+    lat: parseFloat(results[0].lat),
+    lng: parseFloat(results[0].lon),
+  };
 }
 
 /**
@@ -90,109 +145,37 @@ function mergeEvents(events: CollectionEvent[]): CollectionEvent[] {
 export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
   console.log(`[yarra] Scraping for: ${address}`);
 
-  // Clean and normalize
+  // Clean address for geocoding (keep it human-readable for Nominatim)
   let cleanAddress = address
-    .toUpperCase()
-    .replace(new RegExp(`\\b(${STATES.join('|')})\\b`, 'gi'), '')
-    .replace(/,/g, '')
+    .replace(/,/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  cleanAddress = cleanAddress.replace(/\s*\d{4}\s*$/, '').trim();
-  cleanAddress = expandStreetType(cleanAddress);
+  // Remove state abbreviation and postcode for cleaner geocoding
+  cleanAddress = cleanAddress
+    .replace(new RegExp(`\\b(${STATES.join('|')})\\b`, 'gi'), '')
+    .replace(/\s*\d{4}\s*$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 
-  // Remove unit/flat prefix for initial search
-  const withoutUnit = cleanAddress.replace(/^\d+\//, '');
+  console.log(`[yarra] Geocoding: ${cleanAddress}`);
 
-  console.log(`[yarra] Querying address: ${withoutUnit}`);
-
-  // Query 1: Address → coordinates
-  const addrParams = new URLSearchParams({
-    where: `ezi_address LIKE '%${withoutUnit}%'`,
-    outFields: 'ezi_address,locality_name,postcode',
-    returnGeometry: 'true',
-    outSR: '4326',
-    f: 'json',
-    resultRecordCount: '10',
-  });
-
-  console.log(`[yarra] Fetching address via POST`);
-  const addrResp = await fetch(ADDRESS_URL, {
-    method: 'POST',
-    headers: {
-      ...FETCH_HEADERS,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: addrParams.toString(),
-  });
-  if (!addrResp.ok) {
-    const body = await addrResp.text();
-    console.error(`[yarra] Address API error ${addrResp.status}: ${body.substring(0, 500)}`);
-    throw new Error(`Yarra address API error: ${addrResp.status}`);
+  // Step 1: Geocode address → coordinates
+  const coords = await geocodeAddress(cleanAddress);
+  if (!coords) {
+    throw new Error('Could not find this address. Please check the address and try again.');
   }
 
-  const addrData = await addrResp.json();
-  const features = addrData.features || [];
+  console.log(`[yarra] Geocoded to: (${coords.lng}, ${coords.lat})`);
 
-  if (features.length === 0) {
-    throw new Error('Address not found in City of Yarra database.');
+  // Step 2: Find zone using local polygon data
+  const zone = findZone(coords.lng, coords.lat);
+  if (!zone) {
+    throw new Error('This address does not appear to be in the City of Yarra collection area.');
   }
 
-  // Score matches
-  const addressParts = withoutUnit.split(/\s+/).filter(p => p.length > 1);
-  let bestFeature = features[0];
-  let bestScore = 0;
-
-  for (const feature of features) {
-    const eziAddr = feature.attributes.ezi_address;
-    let score = 0;
-    for (const part of addressParts) {
-      if (eziAddr.includes(part)) score++;
-    }
-    console.log(`[yarra]   Match: "${eziAddr}" (score: ${score}/${addressParts.length})`);
-    if (score > bestScore) {
-      bestScore = score;
-      bestFeature = feature;
-    }
-  }
-
-  const coords = bestFeature.geometry;
-  console.log(`[yarra] Best match: "${bestFeature.attributes.ezi_address}" → (${coords.x}, ${coords.y})`);
-
-  // Query 2: Coordinates → zone
-  const zoneParams = new URLSearchParams({
-    geometry: `${coords.x},${coords.y}`,
-    geometryType: 'esriGeometryPoint',
-    inSR: '4326',
-    spatialRel: 'esriSpatialRelIntersects',
-    outFields: 'zone_num,collection_day',
-    returnGeometry: 'false',
-    f: 'json',
-  });
-
-  const zoneResp = await fetch(ZONES_URL, {
-    method: 'POST',
-    headers: {
-      ...FETCH_HEADERS,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: zoneParams.toString(),
-  });
-  if (!zoneResp.ok) {
-    const body = await zoneResp.text();
-    console.error(`[yarra] Zone API error ${zoneResp.status}: ${body.substring(0, 500)}`);
-    throw new Error(`Yarra zone API error: ${zoneResp.status}`);
-  }
-
-  const zoneData = await zoneResp.json();
-  const zoneFeature = zoneData.features?.[0]?.attributes;
-
-  if (!zoneFeature) {
-    throw new Error('Could not determine waste collection zone for this address.');
-  }
-
-  const zoneNum = zoneFeature.zone_num;
-  const collectionDay = zoneFeature.collection_day;
+  const zoneNum = zone.zone_num;
+  const collectionDay = zone.collection_day;
   console.log(`[yarra] Zone: ${zoneNum}, Collection day: ${collectionDay}`);
 
   // Get reference dates for this zone
