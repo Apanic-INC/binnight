@@ -66,49 +66,35 @@ function findZone(lng: number, lat: number): ZonePolygon | null {
 }
 
 /**
- * Geocode an address using OpenStreetMap Nominatim (free, no API key).
- * Retries on 429 (rate limit) with a delay.
+ * Geocode an address using Photon (Komoot) — free OSM-based geocoder.
+ * Unlike Nominatim, Photon doesn't block cloud provider IPs.
  */
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  const query = `${address}, City of Yarra, Victoria, Australia`;
+  const query = `${address}, Victoria, Australia`;
   const params = new URLSearchParams({
     q: query,
-    format: 'json',
     limit: '1',
-    countrycodes: 'au',
+    lang: 'en',
+    lat: '-37.8',   // Bias toward Melbourne
+    lon: '145.0',
   });
 
-  const maxRetries = 3;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-      headers: {
-        'User-Agent': 'BinNight-App/1.0 (apanic.inc@gmail.com)',
-      },
-    });
+  const resp = await fetch(`https://photon.komoot.io/api/?${params}`, {
+    headers: {
+      'User-Agent': 'BinNight-App/1.0 (apanic.inc@gmail.com)',
+    },
+  });
 
-    if (resp.status === 429) {
-      console.log(`[yarra] Nominatim rate limited (attempt ${attempt}/${maxRetries}), waiting...`);
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-        continue;
-      }
-      throw new Error('Geocoding service is temporarily busy. Please try again in a moment.');
-    }
-
-    if (!resp.ok) {
-      throw new Error(`Nominatim geocoding error: ${resp.status}`);
-    }
-
-    const results = await resp.json();
-    if (results.length === 0) return null;
-
-    return {
-      lat: parseFloat(results[0].lat),
-      lng: parseFloat(results[0].lon),
-    };
+  if (!resp.ok) {
+    throw new Error(`Geocoding error: ${resp.status}`);
   }
 
-  return null;
+  const data = await resp.json();
+  const features = data.features || [];
+  if (features.length === 0) return null;
+
+  const [lng, lat] = features[0].geometry.coordinates;
+  return { lat, lng };
 }
 
 /**
