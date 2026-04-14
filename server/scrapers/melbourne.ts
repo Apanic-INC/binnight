@@ -7,9 +7,11 @@ const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 // Suburb-based fallback for areas not covered by the 2021 open data polygons.
 // These are derived from the 2025-26 PDF calendar maps.
 const SUBURB_DAY_FALLBACK: Record<string, string> = {
-  'port melbourne': 'Monday',
-  'fishermans bend': 'Monday',
-  'flemington': 'Monday',
+  'port melbourne': 'Tuesday',
+  'fishermans bend': 'Tuesday',
+  'flemington': 'Thursday',
+  'south yarra': 'Tuesday',
+  'south wharf': 'Tuesday',
 };
 
 // Reference dates for recycling per collection day (from 2025-26 PDF calendars).
