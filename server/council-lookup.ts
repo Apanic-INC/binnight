@@ -47,6 +47,23 @@ const SUBURB_MAP: Record<string, CouncilMapping> = {
   'fitzroy': { scraperId: 'yarra', councilName: 'City of Yarra' },
   'fitzroy north': { scraperId: 'yarra', councilName: 'City of Yarra' },
   'richmond': { scraperId: 'yarra', councilName: 'City of Yarra' },
+
+  // Melbourne suburbs
+  'flemington': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'kensington': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'west melbourne': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'port melbourne': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'north melbourne': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'carlton': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'parkville': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'melbourne': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'docklands': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'south wharf': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'southbank': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'south yarra': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'east melbourne': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'jolimont': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+  'fishermans bend': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
 };
 
 const POSTCODE_MAP: Record<string, CouncilMapping> = {
@@ -74,6 +91,19 @@ const POSTCODE_MAP: Record<string, CouncilMapping> = {
   '3068': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Fitzroy North / Clifton Hill
   '3121': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Richmond / Burnley / Cremorne
   '3054': { scraperId: 'yarra', councilName: 'City of Yarra' }, // Carlton North
+
+  // Melbourne postcodes
+  '3000': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Melbourne CBD
+  '3002': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // East Melbourne
+  '3003': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // West Melbourne
+  '3004': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // South Yarra (Melbourne part)
+  '3006': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Southbank / South Wharf
+  '3008': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Docklands
+  '3031': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Flemington / Kensington
+  '3051': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // North Melbourne
+  '3052': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Parkville
+  '3053': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Carlton
+  '3207': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Port Melbourne
 };
 
 export function lookupCouncil(address: string): CouncilMapping | null {

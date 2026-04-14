@@ -5,6 +5,7 @@ import { lookupCouncil } from './council-lookup';
 import { scrapeMerriBek } from './scrapers/merri-bek';
 import { scrapeDarebin } from './scrapers/darebin';
 import { scrapeYarra } from './scrapers/yarra';
+import { scrapeMelbourne } from './scrapers/melbourne';
 
 const app = express();
 app.use(cors());
@@ -51,6 +52,7 @@ const SCRAPERS: Record<string, (address: string) => Promise<CollectionEvent[]>> 
   'merri-bek': scrapeMerriBek,
   'darebin': scrapeDarebin,
   'yarra': scrapeYarra,
+  'melbourne': scrapeMelbourne,
 };
 
 /**
@@ -226,6 +228,122 @@ function applyYarraHolidayRules(events: CollectionEvent[]): (CollectionEvent & {
   return result;
 }
 
+/**
+ * Calculate Easter Sunday using the Anonymous Gregorian algorithm.
+ * Good Friday is Easter Sunday minus 2 days.
+ */
+function getGoodFriday(year: number): string {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+
+  // Easter Sunday
+  const easter = new Date(year, month - 1, day);
+  // Good Friday = Easter - 2
+  easter.setDate(easter.getDate() - 2);
+  return `${easter.getFullYear()}-${String(easter.getMonth() + 1).padStart(2, '0')}-${String(easter.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Melbourne holiday rules:
+ * 1. Christmas Day (Dec 25): No collection. Collections on that day AND remaining
+ *    weekdays that week shift +1 day (includes Saturday collection).
+ * 2. Good Friday: Collection shifts to Saturday.
+ */
+function applyMelbourneHolidayRules(events: CollectionEvent[]): (CollectionEvent & { isHoliday?: boolean })[] {
+  const result: (CollectionEvent & { isHoliday?: boolean })[] = [];
+
+  const years = new Set(events.map(e => parseInt(e.date.split('-')[0])));
+
+  // Build sets of affected dates
+  const christmasDays = new Set<string>();
+  const goodFridays = new Set<string>();
+
+  // For Christmas, we also need to know which day-of-week it falls on,
+  // so we can shift remaining weekdays in the same week
+  const christmasShiftDays = new Map<string, Set<number>>(); // year-key -> set of day-of-week numbers to shift
+
+  for (const year of years) {
+    const xmasStr = `${year}-12-25`;
+    christmasDays.add(xmasStr);
+
+    // Determine which days-of-week to shift (Christmas day and all later weekdays that week)
+    const xmasDate = new Date(xmasStr + 'T00:00:00');
+    const xmasDow = xmasDate.getDay(); // 0=Sun, 1=Mon, ... 5=Fri
+    const shiftDows = new Set<number>();
+    // Shift Christmas day itself and all later weekdays (Mon=1 through Fri=5)
+    for (let dow = xmasDow; dow <= 5; dow++) {
+      shiftDows.add(dow);
+    }
+    christmasShiftDays.set(String(year), shiftDows);
+
+    // Calculate Good Friday
+    const gfStr = getGoodFriday(year);
+    goodFridays.add(gfStr);
+  }
+
+  // Figure out which dates fall in Christmas week and need shifting
+  // Christmas week = the Mon-Fri week containing Dec 25
+  const christmasWeekDates = new Set<string>();
+  for (const year of years) {
+    const xmasDate = new Date(`${year}-12-25T00:00:00`);
+    const xmasDow = xmasDate.getDay();
+    // Find Monday of Christmas week
+    const mondayOffset = xmasDow === 0 ? -6 : 1 - xmasDow;
+    const monday = new Date(xmasDate.getTime() + mondayOffset * 86400000);
+    const shiftDows = christmasShiftDays.get(String(year))!;
+
+    // Mark each weekday in Christmas week that needs shifting
+    for (let d = 0; d < 5; d++) {
+      const date = new Date(monday.getTime() + d * 86400000);
+      const dow = date.getDay();
+      if (shiftDows.has(dow)) {
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        christmasWeekDates.add(dateStr);
+      }
+    }
+  }
+
+  for (const event of events) {
+    if (christmasDays.has(event.date)) {
+      // Christmas Day itself: mark as holiday, shift to next day
+      result.push({ ...event, isHoliday: true });
+      const shifted = new Date(event.date + 'T00:00:00');
+      shifted.setDate(shifted.getDate() + 1);
+      const shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+      result.push({ date: shiftedStr, bins: event.bins });
+    } else if (christmasWeekDates.has(event.date) && !christmasDays.has(event.date)) {
+      // Other days in Christmas week after Christmas: shift +1 day
+      const shifted = new Date(event.date + 'T00:00:00');
+      shifted.setDate(shifted.getDate() + 1);
+      const shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+      result.push({ date: shiftedStr, bins: event.bins });
+    } else if (goodFridays.has(event.date)) {
+      // Good Friday: mark as holiday, shift to Saturday
+      result.push({ ...event, isHoliday: true });
+      const shifted = new Date(event.date + 'T00:00:00');
+      shifted.setDate(shifted.getDate() + 1);
+      const shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+      result.push({ date: shiftedStr, bins: event.bins });
+    } else {
+      result.push({ ...event });
+    }
+  }
+
+  return result;
+}
+
 // POST /api/setup — receives an address (and optional existingUserId), identifies council, scrapes schedule
 app.post('/api/setup', requireAuth, async (req, res) => {
   const { address, existingUserId } = req.body;
@@ -245,7 +363,7 @@ app.post('/api/setup', requireAuth, async (req, res) => {
 
     if (!councilInfo) {
       return res.status(400).json({
-        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek, Darebin, and Yarra council areas.',
+        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek, Darebin, Yarra, and Melbourne council areas.',
       });
     }
 
@@ -352,6 +470,8 @@ app.post('/api/setup', requireAuth, async (req, res) => {
       processedEvents = applyDarebinHolidayRules(events);
     } else if (councilInfo.scraperId === 'yarra') {
       processedEvents = applyYarraHolidayRules(events);
+    } else if (councilInfo.scraperId === 'melbourne') {
+      processedEvents = applyMelbourneHolidayRules(events);
     } else {
       processedEvents = events;
     }
