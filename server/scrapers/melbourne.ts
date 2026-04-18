@@ -81,12 +81,17 @@ function findZone(lng: number, lat: number): string | null {
 
 /**
  * Geocode an address using Photon (Komoot) — free OSM-based geocoder.
+ *
+ * Photon ranks named POIs above exact street-number matches (e.g. it may
+ * return "Some Cafe at 926 X St" above "851 X St"). To avoid classifying
+ * the wrong building near a zone boundary, we pull several candidates and
+ * prefer the one whose housenumber matches the number in the user's query.
  */
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   const query = `${address}, Victoria, Australia`;
   const params = new URLSearchParams({
     q: query,
-    limit: '1',
+    limit: '10',
     lang: 'en',
     lat: '-37.81',   // Bias toward Melbourne CBD
     lon: '144.96',
@@ -106,7 +111,18 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   const features = data.features || [];
   if (features.length === 0) return null;
 
-  const [lng, lat] = features[0].geometry.coordinates;
+  const housenumMatch = address.trim().match(/^(\d+[a-z]?)\b/i);
+  const wanted = housenumMatch ? housenumMatch[1].toLowerCase() : null;
+
+  let chosen = features[0];
+  if (wanted) {
+    const exactMatch = features.find((f: any) =>
+      String(f.properties?.housenumber || '').toLowerCase() === wanted
+    );
+    if (exactMatch) chosen = exactMatch;
+  }
+
+  const [lng, lat] = chosen.geometry.coordinates;
   return { lat, lng };
 }
 
