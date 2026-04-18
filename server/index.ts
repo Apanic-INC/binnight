@@ -6,6 +6,7 @@ import { scrapeMerriBek } from './scrapers/merri-bek';
 import { scrapeDarebin } from './scrapers/darebin';
 import { scrapeYarra } from './scrapers/yarra';
 import { scrapeMelbourne } from './scrapers/melbourne';
+import { scrapeMooneeValley } from './scrapers/moonee-valley';
 
 const app = express();
 app.use(cors());
@@ -53,6 +54,7 @@ const SCRAPERS: Record<string, (address: string) => Promise<CollectionEvent[]>> 
   'darebin': scrapeDarebin,
   'yarra': scrapeYarra,
   'melbourne': scrapeMelbourne,
+  'moonee-valley': scrapeMooneeValley,
 };
 
 /**
@@ -344,6 +346,53 @@ function applyMelbourneHolidayRules(events: CollectionEvent[]): (CollectionEvent
   return result;
 }
 
+/**
+ * Moonee Valley holiday rules (from 2026 PDF calendars):
+ * - New Year's Day (Jan 1), Good Friday, Christmas Day (Dec 25), and Boxing Day (Dec 26):
+ *   collection shifts forward by 1 day.
+ * - If the shifted target is ALSO one of these holidays, shift again (e.g. Christmas Fri → Sat Boxing Day
+ *   would cascade to Mon if Boxing Day were a weekday).
+ * - All other Victorian public holidays (Australia Day, Labour Day, Easter Monday, ANZAC Day,
+ *   King's Birthday, Melbourne Cup, AFL Grand Final Friday) have normal collection — PDF-confirmed.
+ */
+function applyMooneeValleyHolidayRules(events: CollectionEvent[]): (CollectionEvent & { isHoliday?: boolean })[] {
+  const result: (CollectionEvent & { isHoliday?: boolean })[] = [];
+
+  const years = new Set(events.map(e => parseInt(e.date.split('-')[0])));
+
+  // Build the set of shift-triggering holidays for each year in the event range.
+  const shiftHolidays = new Set<string>();
+  for (const year of years) {
+    shiftHolidays.add(`${year}-01-01`); // New Year's Day
+    shiftHolidays.add(`${year}-12-25`); // Christmas Day
+    shiftHolidays.add(`${year}-12-26`); // Boxing Day
+    shiftHolidays.add(getGoodFriday(year));
+  }
+
+  for (const event of events) {
+    if (shiftHolidays.has(event.date)) {
+      // Mark holiday + shift to next non-holiday day
+      result.push({ ...event, isHoliday: true });
+
+      const shifted = new Date(event.date + 'T00:00:00');
+      shifted.setDate(shifted.getDate() + 1);
+      let shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+
+      // Cascade shift if the next day is also a shift-triggering holiday
+      while (shiftHolidays.has(shiftedStr)) {
+        shifted.setDate(shifted.getDate() + 1);
+        shiftedStr = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+      }
+
+      result.push({ date: shiftedStr, bins: event.bins });
+    } else {
+      result.push({ ...event });
+    }
+  }
+
+  return result;
+}
+
 // POST /api/setup — receives an address (and optional existingUserId), identifies council, scrapes schedule
 app.post('/api/setup', requireAuth, async (req, res) => {
   const { address, existingUserId } = req.body;
@@ -363,7 +412,7 @@ app.post('/api/setup', requireAuth, async (req, res) => {
 
     if (!councilInfo) {
       return res.status(400).json({
-        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek, Darebin, Yarra, and Melbourne council areas.',
+        error: 'Sorry, your council isn\'t supported yet. We currently support Merri-bek, Darebin, Yarra, Melbourne, and Moonee Valley council areas.',
       });
     }
 
@@ -472,6 +521,8 @@ app.post('/api/setup', requireAuth, async (req, res) => {
       processedEvents = applyYarraHolidayRules(events);
     } else if (councilInfo.scraperId === 'melbourne') {
       processedEvents = applyMelbourneHolidayRules(events);
+    } else if (councilInfo.scraperId === 'moonee-valley') {
+      processedEvents = applyMooneeValleyHolidayRules(events);
     } else {
       processedEvents = events;
     }

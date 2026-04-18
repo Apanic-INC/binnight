@@ -4,33 +4,33 @@ import * as path from 'path';
 
 const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 
-// Reference dates for recycling per zone (extracted from council PDF calendars).
-// Zones on the same collection day have opposite recycling/glass fortnights.
-// Glass reference date = recycling reference date + 7 days (they alternate).
-const ZONE_RECYCLE_REF: Record<number, string> = {
-  1:  '2025-07-07', // Monday
-  2:  '2025-07-14', // Monday
-  3:  '2025-07-08', // Tuesday
-  4:  '2025-07-01', // Tuesday
-  5:  '2025-07-09', // Wednesday
-  6:  '2025-07-02', // Wednesday
-  7:  '2025-07-10', // Thursday
-  8:  '2025-07-03', // Thursday
-  9:  '2025-07-11', // Friday
-  10: '2025-07-04', // Friday
+// Reference recycling dates per (Area, collection_day) from 2026 PDF calendars.
+// Area 1 and Area 2 alternate recycling fortnights — Area 1 is offset 7 days later than Area 2.
+// On a recycling week the day is YELLOW; on the intervening week it's GREEN (FOGO).
+const RECYCLE_REF: Record<string, string> = {
+  'Area 1|Monday':    '2026-01-12',
+  'Area 1|Tuesday':   '2026-01-13',
+  'Area 1|Wednesday': '2026-01-14',
+  'Area 1|Thursday':  '2026-01-15',
+  'Area 1|Friday':    '2026-01-16',
+  'Area 2|Monday':    '2026-01-05',
+  'Area 2|Tuesday':   '2026-01-06',
+  'Area 2|Wednesday': '2026-01-07',
+  'Area 2|Thursday':  '2026-01-08',
+  'Area 2|Friday':    '2026-01-09',
 };
 
 interface ZonePolygon {
-  zone_num: number;
-  collection_day: string;
+  area: string;          // "Area 1" or "Area 2"
+  collection_day: string; // "Monday" ... "Friday"
   rings: number[][][];
 }
 
-// Load zone polygons from pre-cached file (fetched from Yarra ArcGIS, simplified)
+// Load zone polygons from pre-cached file (from data.gov.au / Moonee Valley open data, CC-BY 3.0 AU)
 let cachedZones: ZonePolygon[] | null = null;
 function loadZones(): ZonePolygon[] {
   if (cachedZones) return cachedZones;
-  const zonesPath = path.join(__dirname, 'yarra-zones.json');
+  const zonesPath = path.join(__dirname, 'moonee-valley-zones.json');
   cachedZones = JSON.parse(fs.readFileSync(zonesPath, 'utf-8'));
   return cachedZones!;
 }
@@ -52,13 +52,24 @@ function pointInPolygon(x: number, y: number, ring: number[][]): boolean {
 
 /**
  * Find which zone a coordinate falls in.
+ * Returns { area, collection_day } or null.
  */
-function findZone(lng: number, lat: number): ZonePolygon | null {
+function findZone(lng: number, lat: number): { area: string; collection_day: string } | null {
   const zones = loadZones();
   for (const zone of zones) {
-    for (const ring of zone.rings) {
-      if (pointInPolygon(lng, lat, ring)) {
-        return zone;
+    // First ring is outer boundary, subsequent rings are holes (Moonee Valley data has no holes).
+    const outerRing = zone.rings[0];
+    if (pointInPolygon(lng, lat, outerRing)) {
+      // Check if point is in a hole
+      let inHole = false;
+      for (let i = 1; i < zone.rings.length; i++) {
+        if (pointInPolygon(lng, lat, zone.rings[i])) {
+          inHole = true;
+          break;
+        }
+      }
+      if (!inHole) {
+        return { area: zone.area, collection_day: zone.collection_day };
       }
     }
   }
@@ -67,7 +78,6 @@ function findZone(lng: number, lat: number): ZonePolygon | null {
 
 /**
  * Geocode an address using Photon (Komoot) — free OSM-based geocoder.
- * Unlike Nominatim, Photon doesn't block cloud provider IPs.
  */
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   const query = `${address}, Victoria, Australia`;
@@ -75,8 +85,8 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
     q: query,
     limit: '1',
     lang: 'en',
-    lat: '-37.8',   // Bias toward Melbourne
-    lon: '145.0',
+    lat: '-37.77',   // Bias toward Moonee Valley
+    lon: '144.89',
   });
 
   const resp = await fetch(`https://photon.komoot.io/api/?${params}`, {
@@ -144,10 +154,10 @@ function mergeEvents(events: CollectionEvent[]): CollectionEvent[] {
     .map(([date, bins]) => ({ date, bins }));
 }
 
-export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
-  console.log(`[yarra] Scraping for: ${address}`);
+export async function scrapeMooneeValley(address: string): Promise<CollectionEvent[]> {
+  console.log(`[moonee-valley] Scraping for: ${address}`);
 
-  // Clean address for geocoding (keep it human-readable for Nominatim)
+  // Clean address for geocoding
   let cleanAddress = address
     .replace(/,/g, ' ')
     .replace(/\s{2,}/g, ' ')
@@ -160,45 +170,45 @@ export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  console.log(`[yarra] Geocoding: ${cleanAddress}`);
+  console.log(`[moonee-valley] Geocoding: ${cleanAddress}`);
 
-  // Step 1: Geocode address → coordinates
+  // Step 1: Geocode address
   const coords = await geocodeAddress(cleanAddress);
   if (!coords) {
     throw new Error('Could not find this address. Please check the address and try again.');
   }
 
-  console.log(`[yarra] Geocoded to: (${coords.lng}, ${coords.lat})`);
+  console.log(`[moonee-valley] Geocoded to: (${coords.lng}, ${coords.lat})`);
 
-  // Step 2: Find zone using local polygon data
+  // Step 2: Find zone (Area + collection day) using local polygon data
   const zone = findZone(coords.lng, coords.lat);
+
   if (!zone) {
-    throw new Error('This address does not appear to be in the City of Yarra collection area.');
+    throw new Error('This address does not appear to be in the City of Moonee Valley collection area.');
   }
 
-  const zoneNum = zone.zone_num;
-  const collectionDay = zone.collection_day;
-  console.log(`[yarra] Zone: ${zoneNum}, Collection day: ${collectionDay}`);
+  const { area, collection_day: collectionDay } = zone;
+  console.log(`[moonee-valley] Zone: ${area} / ${collectionDay}`);
 
-  // Get reference dates for this zone
-  const recycleRef = ZONE_RECYCLE_REF[zoneNum];
+  // Get recycling reference date
+  const recycleRef = RECYCLE_REF[`${area}|${collectionDay}`];
   if (!recycleRef) {
-    throw new Error(`Unknown zone number: ${zoneNum}`);
+    throw new Error(`Unknown zone combination: ${area} / ${collectionDay}`);
   }
 
-  // Glass reference = recycling reference + 7 days (UTC-safe; avoids DST drift)
+  // FOGO reference is one week after recycling (UTC-safe; avoids DST drift)
   const [ry, rm, rd] = recycleRef.split('-').map(Number);
-  const glassDate = new Date(Date.UTC(ry, rm - 1, rd));
-  glassDate.setUTCDate(glassDate.getUTCDate() + 7);
-  const glassRef = `${glassDate.getUTCFullYear()}-${String(glassDate.getUTCMonth() + 1).padStart(2, '0')}-${String(glassDate.getUTCDate()).padStart(2, '0')}`;
+  const fogoRefDate = new Date(Date.UTC(ry, rm - 1, rd));
+  fogoRefDate.setUTCDate(fogoRefDate.getUTCDate() + 7);
+  const fogoRef = `${fogoRefDate.getUTCFullYear()}-${String(fogoRefDate.getUTCMonth() + 1).padStart(2, '0')}-${String(fogoRefDate.getUTCDate()).padStart(2, '0')}`;
 
   // Generate events
   const allEvents: CollectionEvent[] = [];
 
-  // Rubbish + FOGO (weekly)
+  // Rubbish (weekly) — every week, same day
   const rubbishDates = generateDates(recycleRef, 52, 7);
   for (const date of rubbishDates) {
-    allEvents.push({ date, bins: ['rubbish', 'fogo'] });
+    allEvents.push({ date, bins: ['rubbish'] });
   }
 
   // Recycling (fortnightly)
@@ -207,13 +217,15 @@ export async function scrapeYarra(address: string): Promise<CollectionEvent[]> {
     allEvents.push({ date, bins: ['recycling'] });
   }
 
-  // Glass (fortnightly, alternates with recycling)
-  const glassDates = generateDates(glassRef, 26, 14);
-  for (const date of glassDates) {
-    allEvents.push({ date, bins: ['glass'] });
+  // FOGO (fortnightly, alternating with recycling)
+  const fogoDates = generateDates(fogoRef, 26, 14);
+  for (const date of fogoDates) {
+    allEvents.push({ date, bins: ['fogo'] });
   }
 
+  // No curbside glass — Moonee Valley doesn't offer it
+
   const merged = mergeEvents(allEvents);
-  console.log(`[yarra] Generated ${merged.length} events for zone ${zoneNum}`);
+  console.log(`[moonee-valley] Generated ${merged.length} events for ${area} / ${collectionDay}`);
   return merged;
 }

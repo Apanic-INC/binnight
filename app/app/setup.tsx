@@ -108,8 +108,8 @@ export default function SetupScreen() {
           />
 
           <Text style={styles.councilNote}>
-            Currently supports Merri-bek, Darebin,{'\n'}
-            Yarra, and Melbourne council areas
+            Currently supports Merri-bek, Darebin, Yarra,{'\n'}
+            Melbourne, and Moonee Valley council areas
           </Text>
 
           {error && (

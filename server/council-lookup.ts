@@ -64,6 +64,26 @@ const SUBURB_MAP: Record<string, CouncilMapping> = {
   'east melbourne': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
   'jolimont': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
   'fishermans bend': { scraperId: 'melbourne', councilName: 'City of Melbourne' },
+
+  // Moonee Valley suburbs (unique — no overlap with existing councils)
+  // Note: parts of Pascoe Vale/Pascoe Vale South/Oak Park/Tullamarine/Flemington/Kensington are in
+  // Moonee Valley too, but those suburbs stay mapped to Merri-bek/Melbourne for now; overlap
+  // handling will be revisited when we add neighbouring councils.
+  'ascot vale': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'moonee ponds': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'essendon': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'essendon north': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'essendon west': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'essendon fields': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'aberfeldie': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'niddrie': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'airport west': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'strathmore': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'strathmore heights': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'travancore': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'keilor east': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'keilor park': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
+  'avondale heights': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' },
 };
 
 const POSTCODE_MAP: Record<string, CouncilMapping> = {
@@ -104,6 +124,16 @@ const POSTCODE_MAP: Record<string, CouncilMapping> = {
   '3052': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Parkville
   '3053': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Carlton
   '3207': { scraperId: 'melbourne', councilName: 'City of Melbourne' }, // Port Melbourne
+
+  // Moonee Valley postcodes (unique — no overlap with Merri-bek or Melbourne postcodes)
+  '3032': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Ascot Vale
+  '3033': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Keilor East
+  '3034': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Avondale Heights
+  '3036': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Keilor Park
+  '3039': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Moonee Ponds
+  '3040': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Essendon / Essendon North/West / Aberfeldie
+  '3041': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Niddrie
+  '3042': { scraperId: 'moonee-valley', councilName: 'City of Moonee Valley' }, // Airport West / Strathmore / Strathmore Heights / Essendon Fields
 };
 
 export function lookupCouncil(address: string): CouncilMapping | null {

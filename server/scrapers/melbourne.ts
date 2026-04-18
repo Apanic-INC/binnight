@@ -112,28 +112,29 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
 
 /**
  * Generate dates at a fixed interval, advancing past today.
+ * Uses UTC-based calendar arithmetic to avoid DST transition bugs
+ * (e.g. Australian AEDT→AEST fall-back causes ms-based arithmetic
+ * to drift by 1 hour, which can roll getDate() back a day).
  */
 function generateDates(startDateStr: string, count: number, intervalDays: number): string[] {
-  const start = new Date(startDateStr + 'T00:00:00');
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const [sy, sm, sd] = startDateStr.split('-').map(Number);
+  const start = new Date(Date.UTC(sy, sm - 1, sd));
 
-  const msInterval = intervalDays * 24 * 60 * 60 * 1000;
-  const elapsed = today.getTime() - start.getTime();
-  if (elapsed > 0) {
-    const periodsElapsed = Math.floor(elapsed / msInterval);
-    start.setTime(start.getTime() + periodsElapsed * msInterval);
-    if (start.getTime() < today.getTime()) {
-      start.setTime(start.getTime() + msInterval);
-    }
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+
+  // Advance start past today by whole intervalDays steps
+  while (start.getTime() < today.getTime()) {
+    start.setUTCDate(start.getUTCDate() + intervalDays);
   }
 
   const dates: string[] = [];
   for (let i = 0; i < count; i++) {
-    const d = new Date(start.getTime() + i * msInterval);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const d = new Date(start.getTime());
+    d.setUTCDate(d.getUTCDate() + i * intervalDays);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
     dates.push(`${year}-${month}-${day}`);
   }
   return dates;
