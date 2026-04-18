@@ -4,3 +4,9 @@ dist/
 *.log
 .env
 app/node_modules/
+
+# Stale debug artefacts from early scraper development
+.DS_Store
+debug-*.png
+debug-*.html
+/schedule.json
